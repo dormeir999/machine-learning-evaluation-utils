@@ -331,3 +331,69 @@ def add_ramzor_cols(the_df, ramzor_edges=None, the_prob_col=None):
     ramzor_mapper = dict(zip(the_df['ramzor_prob'].unique().tolist(),['Green','Yellow','Red']))
     the_df['ramzor'] = the_df['ramzor_prob'].map(ramzor_mapper)
     return the_df
+  
+def get_ramzor_metrics(the_df, ramzor_edges=None, threshold=0.6, target_col='target',
+                        groupby_col='ramzor_prob',
+                        proba_col='Naive.Xgboost2_predict_probability',
+                        response_col='Naive.Xgboost2_predict_response'):
+    """
+    Groups the models probability predictions into 3 colors: red (low), yellow (medium) and green (high),
+    and reports metrics on each group.
+    :param the_df: a DataFrame with probability predictions column
+    :param ramzor_edges: the edges defining the groups. By default, [0,0.333,0.667,1]
+    :param threshold: optional: a specific threshold to calc metrics on. Default is False = will find f1 optimized threhold on proba_col
+    :param target_col: the name of the target feature
+    :param groupby_col: The groupby_col, in this case it's ramzor_prob, can also be ramzor for the colors names
+    :param proba_col: the name of the probability col to use for calculation of the metrics
+    :param response_col: the name of the reposne col. a new col will be created with the name + the threshold
+    :return:
+    """
+    the_df = add_ramzor_cols(the_df, ramzor_edges=ramzor_edges, the_prob_col=proba_col)
+    the_metrics = get_metrics_df_on_feature_on_prob(the_df, threshold=threshold, target_col=target_col,
+                                                    groupby_col=groupby_col,
+                                                    proba_col=proba_col,
+                                                    response_col=response_col)
+    return the_df, the_metrics
+
+
+def plot_ramzor_metrics(ramzor_metrics, metrics_to_plot=None):
+    """
+    Plots metrics from get_ramzor_metrics()
+    :param ramzor_metrics: a data frame with the metrics of the ramzor. the result of get_ramzor_metrics()
+    :param metrics_to_plot: a metrics list to plot. default is ['unique_ids', 'distribution','recall','precision','lift','f1']
+    :return: the same ramzor_metrics dataframe it recieved
+    """
+    if not metrics_to_plot:
+        metrics_to_plot = ['unique_ids', 'distribution','recall','precision','lift','f1']
+    for metric_name in metrics_to_plot:
+        ramzor_metrics[metric_name].plot.bar(title=metric_name, rot=0, color=['r','y','g'])
+        if ramzor_metrics[metric_name].max() <= 1:
+            plt.ylim([0,1])
+        plt.show()
+    return ramzor_metrics
+
+
+def calc_and_plot_ramzor_metrics(the_df, ramzor_edges=None, threshold=0.6, target_col='target',
+                                 groupby_col='ramzor_prob',
+                                 proba_col='Naive.Xgboost2_predict_probability',
+                                 response_col='Naive.Xgboost2_predict_response', metrics_to_plot=None):
+    """
+    Groups the models probability predictions into 3 colors: red (low), yellow (medium) and green (high),
+    reports metrics on each group and plots desired metrics.
+    :param the_df: a DataFrame with probability predictions column
+    :param ramzor_edges: the edges defining the groups. By default, [0,0.333,0.667,1]
+    :param threshold: optional: a specific threshold to calc metrics on. Default is False = will find f1 optimized threhold on proba_col
+    :param target_col: the name of the target feature
+    :param groupby_col: The groupby_col, in this case it's ramzor_prob, can also be ramzor for the colors names
+    :param proba_col: the name of the probability col to use for calculation of the metrics
+    :param response_col: the name of the reposne col. a new col will be created with the name + the threshold
+    :param metrics_to_plot: a metrics list to plot. default is ['unique_ids', 'distribution','recall','precision','lift','f1']
+    :return: the ramzor metrics df the original dataframe with two additional group columns - the group probability range and the group color
+    """
+    the_df = add_ramzor_cols(the_df, ramzor_edges=ramzor_edges, the_prob_col=proba_col)
+    the_metrics = get_metrics_df_on_feature_on_prob(the_df, threshold=threshold, target_col=target_col,
+                                                    groupby_col=groupby_col,
+                                                    proba_col=proba_col,
+                                                    response_col=response_col)
+    the_metrics = plot_ramzor_metrics(the_metrics, metrics_to_plot=metrics_to_plot)
+    return the_df, the_metrics
