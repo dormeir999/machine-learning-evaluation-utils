@@ -313,3 +313,21 @@ def plot_metrics_of_feature_two_dfs(the_df_metrics_nz, the_df2_metrics_nz,
         plot_metric_to_feature(the_df2_metrics_nz, max_val=max_val, min_val=min_val, lift=lift, precision=precision,
                                f1=f1, recall=recall, distribution=distribution,
                                title=the_df2_title)
+
+        
+def add_ramzor_cols(the_df, ramzor_edges=None, the_prob_col=None):
+    """
+    Groups the models probability predictions into 3 colors: red (low), yellow (medium) and green (high)
+    :param the_df: a DataFrame with probability predictions column
+    :param ramzor_edges: the edges defining the groups. By default, [0,0.333,0.667,1]
+    :param the_prob_col: the probability columns to use. if not provided, take the first column containing the string 'prob'
+    :return: the dataframe with two additional group columns - the group probability range and the group color
+    """
+    if not the_prob_col:
+        the_prob_col = [col for col in the_df.columns if 'prob' in col][0]
+    if not ramzor_edges:
+        ramzor_edges = [0,0.333,0.667,1]
+    the_df['ramzor_prob'] = pd.cut(the_df[the_prob_col],ramzor_edges)
+    ramzor_mapper = dict(zip(the_df['ramzor_prob'].unique().tolist(),['Green','Yellow','Red']))
+    the_df['ramzor'] = the_df['ramzor_prob'].map(ramzor_mapper)
+    return the_df
