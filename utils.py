@@ -117,8 +117,23 @@ def get_metrics_on_all_col_values(the_df, the_col, pred_col='Naive.Logistic_pred
         print(val) if to_print else ""
         metrics = calc_metrics(the_df[the_df[the_col] == val], the_index=[val], pred_col=pred_col,
                                ground_truth=ground_truth, append_df=metrics)
+    metrics = fix_lift_metrics(the_df, metrics)
     return metrics
 
+  
+  def fix_lift_metrics(the_df, metrics, ground_truth='target'):
+    """
+    Fix an existing lift column in metrics df on feature values - get_metrics_on_all_col_values(), so that the precision
+    for each value will be devided by total target distribution in the_df
+    :param the_df: a dataframe which the metrics df was calculated on
+    :param metrics: a metrics dataframe, output of get_metrics_on_all_col_values()
+    :param ground_truth: the target feature
+    :return: the metrics df with the lift column fixed
+    """
+    target_dist = the_df[ground_truth].mean()
+    metrics['lift'] = metrics['precision']/target_dist
+    return metrics
+  
 
 def plot_metric_to_feature(the_metrics, col='nekudot_zchut_sem_b4_sem', max_val=75, min_val=10, distribution=True,
                            unique_ids=False, observations=False, precision=True, recall=False, lift=False,
