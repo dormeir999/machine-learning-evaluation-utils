@@ -118,22 +118,25 @@ def get_metrics_on_all_col_values(the_df, the_col, pred_col='Naive.Logistic_pred
         metrics = calc_metrics(the_df[the_df[the_col] == val], the_index=[val], pred_col=pred_col,
                                ground_truth=ground_truth, append_df=metrics)
     metrics = fix_lift_metrics(the_df, metrics)
+    for val in metrics.index.tolist():
+        metrics.loc[val, 'proba_mean'] = the_df.loc[the_df['ramzor_prob'] == val, 'proba_mean'].values[0]
+    metrics = move_cols_to_first(metrics, ['proba_mean'])
     return metrics
 
-  
-  def fix_lift_metrics(the_df, metrics, ground_truth='target'):
+
+def fix_lift_metrics(the_df, metrics, ground_truth='target'):
     """
-    Fix an existing lift column in metrics df on feature values - get_metrics_on_all_col_values(), so that the precision
-    for each value will be devided by total target distribution in the_df
+    Fix an existing lift column in metrics df on feature values - get_metrics_on_all_col_values(), so that the target mean
+    for each value will be divided by total target distribution in the_df
     :param the_df: a dataframe which the metrics df was calculated on
     :param metrics: a metrics dataframe, output of get_metrics_on_all_col_values()
     :param ground_truth: the target feature
     :return: the metrics df with the lift column fixed
     """
     target_dist = the_df[ground_truth].mean()
-    metrics['lift'] = metrics['precision']/target_dist
+    metrics['lift'] = metrics['distribution']/target_dist
     return metrics
-  
+
 
 def plot_metric_to_feature(the_metrics, col='nekudot_zchut_sem_b4_sem', max_val=75, min_val=10, distribution=True,
                            unique_ids=False, observations=False, precision=True, recall=False, lift=False,
@@ -329,28 +332,36 @@ def plot_metrics_of_feature_two_dfs(the_df_metrics_nz, the_df2_metrics_nz,
                                f1=f1, recall=recall, distribution=distribution,
                                title=the_df2_title)
 
-        
-def add_ramzor_cols(the_df, ramzor_edges=None, the_prob_col=None):
+
+def add_ramzor_cols(the_df, the_prob_col=None, ramzor_edges=None, even_quantiles=True):
     """
     Groups the models probability predictions into 3 colors: red (low), yellow (medium) and green (high)
     :param the_df: a DataFrame with probability predictions column
-    :param ramzor_edges: the edges defining the groups. By default, [0,0.333,0.667,1]
     :param the_prob_col: the probability columns to use. if not provided, take the first column containing the string 'prob'
+    :param ramzor_edges: the edges defining the groups. By default, [0,0.333,0.667,1]
+    :param even_quantiles: instead of ramzor_edges, cut to 3 equal sized quantiles
     :return: the dataframe with two additional group columns - the group probability range and the group color
     """
     if not the_prob_col:
         the_prob_col = [col for col in the_df.columns if 'prob' in col][0]
     if not ramzor_edges:
         ramzor_edges = [0,0.333,0.667,1]
-    the_df['ramzor_prob'] = pd.cut(the_df[the_prob_col],ramzor_edges)
+    if not even_quantiles:
+        the_df['ramzor_prob'] = pd.cut(the_df[the_prob_col], ramzor_edges)
+    else:
+        the_df['ramzor_prob'] = pd.qcut(the_df[the_prob_col], 3)
     ramzor_mapper = dict(zip(the_df['ramzor_prob'].unique().tolist(),['Green','Yellow','Red']))
     the_df['ramzor'] = the_df['ramzor_prob'].map(ramzor_mapper)
+    ramzor_proba_mean_mapper = the_df.groupby('ramzor')[the_prob_col].mean().to_dict()
+    the_df['proba_mean'] = the_df['ramzor'].map(ramzor_proba_mean_mapper)
     return the_df
-  
+
+
 def get_ramzor_metrics(the_df, ramzor_edges=None, threshold=0.6, target_col='target',
                         groupby_col='ramzor_prob',
                         proba_col='Naive.Xgboost2_predict_probability',
-                        response_col='Naive.Xgboost2_predict_response'):
+                        response_col='Naive.Xgboost2_predict_response',
+                        even_quantiles=True):
     """
     Groups the models probability predictions into 3 colors: red (low), yellow (medium) and green (high),
     and reports metrics on each group.
@@ -361,9 +372,10 @@ def get_ramzor_metrics(the_df, ramzor_edges=None, threshold=0.6, target_col='tar
     :param groupby_col: The groupby_col, in this case it's ramzor_prob, can also be ramzor for the colors names
     :param proba_col: the name of the probability col to use for calculation of the metrics
     :param response_col: the name of the reposne col. a new col will be created with the name + the threshold
+    :param even_quantiles: Instead of ramzor predefined edges, cut using 3 equal quantiles.
     :return:
     """
-    the_df = add_ramzor_cols(the_df, ramzor_edges=ramzor_edges, the_prob_col=proba_col)
+    the_df = add_ramzor_cols(the_df, even_quantiles=even_quantiles, ramzor_edges=ramzor_edges, the_prob_col=proba_col)
     the_metrics = get_metrics_df_on_feature_on_prob(the_df, threshold=threshold, target_col=target_col,
                                                     groupby_col=groupby_col,
                                                     proba_col=proba_col,
@@ -391,7 +403,8 @@ def plot_ramzor_metrics(ramzor_metrics, metrics_to_plot=None):
 def calc_and_plot_ramzor_metrics(the_df, ramzor_edges=None, threshold=0.6, target_col='target',
                                  groupby_col='ramzor_prob',
                                  proba_col='Naive.Xgboost2_predict_probability',
-                                 response_col='Naive.Xgboost2_predict_response', metrics_to_plot=None):
+                                 response_col='Naive.Xgboost2_predict_response', metrics_to_plot=None,
+                                 even_quantiles=True):
     """
     Groups the models probability predictions into 3 colors: red (low), yellow (medium) and green (high),
     reports metrics on each group and plots desired metrics.
@@ -403,9 +416,10 @@ def calc_and_plot_ramzor_metrics(the_df, ramzor_edges=None, threshold=0.6, targe
     :param proba_col: the name of the probability col to use for calculation of the metrics
     :param response_col: the name of the reposne col. a new col will be created with the name + the threshold
     :param metrics_to_plot: a metrics list to plot. default is ['unique_ids', 'distribution','recall','precision','lift','f1']
+    :param even_quantiles: instead of ramzor_edges, cut to 3 equal sized quantiles:param even_quantiles: instead of ramzor_edges, cut to 3 equal sized quantiles
     :return: the ramzor metrics df the original dataframe with two additional group columns - the group probability range and the group color
     """
-    the_df = add_ramzor_cols(the_df, ramzor_edges=ramzor_edges, the_prob_col=proba_col)
+    the_df = add_ramzor_cols(the_df, ramzor_edges=ramzor_edges, the_prob_col=proba_col, even_quantiles=even_quantiles)
     the_metrics = get_metrics_df_on_feature_on_prob(the_df, threshold=threshold, target_col=target_col,
                                                     groupby_col=groupby_col,
                                                     proba_col=proba_col,
