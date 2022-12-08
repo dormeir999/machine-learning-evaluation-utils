@@ -3,6 +3,14 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+
+
+def my_name() -> str:
+    """
+    Print current function name
+    """
+    return sys._getframe(1).f_code.co_name
 
 
 def calc_metrics(the_df, the_index=['baseline'], pred_col='Naive.Xgboost2_predict_response',
@@ -17,6 +25,7 @@ def calc_metrics(the_df, the_index=['baseline'], pred_col='Naive.Xgboost2_predic
     :param append_df: Can be None. if exists, adds the current calcs to prior calcs df
     :return: A dataframe with the results
     """
+    print(f'{my_name()}')
     my_dict = {}
     if not isinstance(the_index, list):
         the_index = [the_index]
@@ -58,6 +67,7 @@ def get_metrics_on_all_thresholds(the_df, prob_col):
     :param prob_col: the probability column name
     :return: A dataframe with 100 rows, each row with metrics from calc_metrics()
     """
+    print(f'{my_name()}')
     thresholds = np.arange(0, 1, 0.01)
     the_metrics = pd.DataFrame()
     for thresh in thresholds:
@@ -74,6 +84,7 @@ def move_cols_to_first(the_df, first_cols):
     :param first_cols: a list of columns to be first cols in the df
     :return: the dataframe rearranged
     """
+    print(f'{my_name()}')
     the_df = pd.concat([the_df[first_cols], the_df.loc[:, ~the_df.columns.isin(first_cols)]], axis=1)
     return the_df
 
@@ -84,6 +95,7 @@ def get_all_models_max_f1_thresh(the_df):
     :param the_df: A dataframe with one or more prediction columns that their name has 'prob' in them
     :return: A dataframe with a row per each model, with metrics on maximized threshold on f1-score
     """
+    print(f'{my_name()}')
     prob_cols = [col for col in the_df.columns if 'prob' in col]
     all_models_max_f1_thresh = {}
     len_cols = len(prob_cols)
@@ -111,6 +123,7 @@ def get_metrics_on_all_col_values(the_df, the_col, pred_col='Naive.Logistic_pred
     :param to_print: bool to report which feature value are we calclating on now
     :return: the df with indexes as the feature values, and columns as the metrics
     """
+    print(f'{my_name()}')
     all_values = np.sort(the_df[the_col].unique())
     metrics = pd.DataFrame()
     for val in all_values:
@@ -120,7 +133,7 @@ def get_metrics_on_all_col_values(the_df, the_col, pred_col='Naive.Logistic_pred
     metrics = fix_lift_metrics(the_df, metrics)
     for val in metrics.index.tolist():
         metrics.loc[val, 'proba_mean'] = the_df.loc[the_df['ramzor_prob'] == val, 'proba_mean'].values[0]
-    metrics = move_cols_to_first(metrics, ['proba_mean'])
+    metrics = move_cols_to_first(metrics, ['proba_mean', 'distribution', 'lift'])
     return metrics
 
 
@@ -133,6 +146,7 @@ def fix_lift_metrics(the_df, metrics, ground_truth='target'):
     :param ground_truth: the target feature
     :return: the metrics df with the lift column fixed
     """
+    print(f'{my_name()}')
     target_dist = the_df[ground_truth].mean()
     metrics['lift'] = metrics['distribution']/target_dist
     return metrics
@@ -172,6 +186,7 @@ def plot_metric_to_feature(the_metrics, col='nekudot_zchut_sem_b4_sem', max_val=
     :param f1_heb_title: f1-score legend description in hebrew
     :return: the plot of the metrics df with row per each columns value. Can be fed into a display() command
     """
+    print(f'{my_name()}')
     max_val = max_val if max_val else the_metrics.index.max()
     min_val = min_val if min_val else the_metrics.index.min()
     if all:
@@ -239,6 +254,7 @@ def compare_feature_distributions_two_dfs(the_df1, df1_name, the_df2, df2_name, 
     :return: The dataframe with one col per each df, where each row is the feature's value.
              if add_cumsum=True, another column for each df with the orig col cumsum.
     """
+    print(f'{my_name()}')
     agg_val_df1 = the_df1.groupby(groupby_feature)[feature].agg(agg_func).value_counts(normalize=True,
                                                                                        dropna=False).to_frame().rename(
         columns={feature: df1_name})
@@ -259,6 +275,7 @@ def get_diff_in_cols(the_df1, the_df2):
     :param the_df2: the 2nd df
     :return: the list of cols that are in 1st df and not in 2nd df
     """
+    print(f'{my_name()}')
     res = [col for col in the_df1.columns if col not in the_df2.columns]
     return res
 
@@ -279,6 +296,7 @@ def get_metrics_df_on_feature_on_prob(the_df, threshold=None, target_col='target
     :param response_col: the name of the reposne col. a new col will be created with the name + the threshold
     :return:
     """
+    print(f'{my_name()}')
     if not threshold:
         print(f"No threshold was inserted, calculating threshold on {proba_col} that maximizes f1:")
         models_max_f1_df = get_all_models_max_f1_thresh(the_df)
@@ -315,6 +333,7 @@ def plot_metrics_of_feature_two_dfs(the_df_metrics_nz, the_df2_metrics_nz,
     :return: Two plots, one above the other, with possibly the data tables beneath each plot.
              Each plot is of the metrics df with row per each columns value.
     """
+    print(f'{my_name()}')
     if return_table:
         display(
             plot_metric_to_feature(the_df_metrics_nz, max_val=max_val, min_val=min_val, lift=lift, precision=precision,
@@ -342,6 +361,7 @@ def add_ramzor_cols(the_df, the_prob_col=None, ramzor_edges=None, even_quantiles
     :param even_quantiles: instead of ramzor_edges, cut to 3 equal sized quantiles
     :return: the dataframe with two additional group columns - the group probability range and the group color
     """
+    print(f'{my_name()}')
     if not the_prob_col:
         the_prob_col = [col for col in the_df.columns if 'prob' in col][0]
     if not ramzor_edges:
@@ -375,6 +395,7 @@ def get_ramzor_metrics(the_df, ramzor_edges=None, threshold=0.6, target_col='tar
     :param even_quantiles: Instead of ramzor predefined edges, cut using 3 equal quantiles.
     :return:
     """
+    print(f'{my_name()}')
     the_df = add_ramzor_cols(the_df, even_quantiles=even_quantiles, ramzor_edges=ramzor_edges, the_prob_col=proba_col)
     the_metrics = get_metrics_df_on_feature_on_prob(the_df, threshold=threshold, target_col=target_col,
                                                     groupby_col=groupby_col,
@@ -390,6 +411,7 @@ def plot_ramzor_metrics(ramzor_metrics, metrics_to_plot=None):
     :param metrics_to_plot: a metrics list to plot. default is ['unique_ids', 'distribution','recall','precision','lift','f1']
     :return: the same ramzor_metrics dataframe it recieved
     """
+    print(f'{my_name()}')
     if not metrics_to_plot:
         metrics_to_plot = ['unique_ids', 'distribution','recall','precision','lift','f1']
     for metric_name in metrics_to_plot:
@@ -419,6 +441,7 @@ def calc_and_plot_ramzor_metrics(the_df, ramzor_edges=None, threshold=0.6, targe
     :param even_quantiles: instead of ramzor_edges, cut to 3 equal sized quantiles:param even_quantiles: instead of ramzor_edges, cut to 3 equal sized quantiles
     :return: the ramzor metrics df the original dataframe with two additional group columns - the group probability range and the group color
     """
+    print(f'{my_name()}')
     the_df = add_ramzor_cols(the_df, ramzor_edges=ramzor_edges, the_prob_col=proba_col, even_quantiles=even_quantiles)
     the_metrics = get_metrics_df_on_feature_on_prob(the_df, threshold=threshold, target_col=target_col,
                                                     groupby_col=groupby_col,
